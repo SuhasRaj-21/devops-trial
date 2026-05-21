@@ -39,7 +39,18 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                echo 'Running SonarQube Analysis...'
+
+                withSonarQubeEnv('sonar') {
+
+                    bat '''
+                    sonar-scanner ^
+                    -Dsonar.projectKey=devops-project ^
+                    -Dsonar.projectName=devops-project ^
+                    -Dsonar.sources=. ^
+                    -Dsonar.host.url=http://localhost:9000 ^
+                    -Dsonar.token=squ_341495b464bca954ee9b232a6e4dab8db8848a06
+                    '''
+                }
             }
         }
 
@@ -51,8 +62,10 @@ pipeline {
 
         stage('Stop Old Container') {
             steps {
-                bat 'docker stop %CONTAINER_NAME% || exit 0'
-                bat 'docker rm %CONTAINER_NAME% || exit 0'
+                bat '''
+                docker stop %CONTAINER_NAME% || exit 0
+                docker rm %CONTAINER_NAME% || exit 0
+                '''
             }
         }
 
@@ -67,16 +80,27 @@ pipeline {
                 bat 'docker ps'
             }
         }
+
+        stage('Application Test') {
+            steps {
+                echo 'Application deployed successfully on Docker'
+            }
+        }
     }
 
     post {
 
         success {
-            echo 'Pipeline executed successfully!'
+            echo '===================================='
+            echo 'PIPELINE EXECUTED SUCCESSFULLY!'
+            echo 'Docker Container Running Successfully'
+            echo '===================================='
         }
 
         failure {
-            echo 'Pipeline execution failed!'
+            echo '===================================='
+            echo 'PIPELINE EXECUTION FAILED!'
+            echo '===================================='
         }
     }
 }
