@@ -80,6 +80,5 @@ post {
         echo 'Pipeline failed. Check console output.'
     }
 }
-```
 
 }
