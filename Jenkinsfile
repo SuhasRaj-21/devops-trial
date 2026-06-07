@@ -1,7 +1,6 @@
 pipeline {
 agent any
 
-```
 environment {
     PYTHON = "C:\\Users\\suhas\\AppData\\Local\\Programs\\Python\\Python311\\python.exe"
     IMAGE_NAME = "devops-project"
@@ -92,6 +91,6 @@ post {
         echo '===================================='
     }
 }
-```
+
 
 }
