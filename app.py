@@ -195,32 +195,115 @@ def dashboard():
     )
 
 
-@app.route('/students')
+@app.route('/students', methods=['GET', 'POST'])
 @login_required
 def students():
 
     conn = get_db_connection()
 
-    students = conn.execute(
-        'SELECT * FROM students'
-    ).fetchall()
+    if request.method == 'POST':
+        action = request.form.get('action')
+
+        if action == 'add':
+            name = request.form['student_name']
+            usn = request.form['usn']
+            dept = request.form['department']
+            try:
+                conn.execute(
+                    'INSERT INTO students (student_name, usn, department) VALUES (?, ?, ?)',
+                    (name, usn, dept)
+                )
+                conn.commit()
+                flash('Student added successfully!', 'success')
+            except sqlite3.IntegrityError:
+                flash('USN already exists!', 'danger')
+
+        elif action == 'edit':
+            student_id = request.form['student_id']
+            name = request.form['student_name']
+            usn = request.form['usn']
+            dept = request.form['department']
+            try:
+                conn.execute(
+                    'UPDATE students SET student_name=?, usn=?, department=? WHERE id=?',
+                    (name, usn, dept, student_id)
+                )
+                conn.commit()
+                flash('Student updated successfully!', 'success')
+            except sqlite3.IntegrityError:
+                flash('USN already exists!', 'danger')
+
+        elif action == 'delete':
+            student_id = request.form['student_id']
+            conn.execute('DELETE FROM attendance WHERE student_id=?', (student_id,))
+            conn.execute('DELETE FROM students WHERE id=?', (student_id,))
+            conn.commit()
+            flash('Student deleted successfully!', 'success')
+
+        conn.close()
+        return redirect(url_for('students'))
+
+    search = request.args.get('search', '')
+    if search:
+        students = conn.execute(
+            'SELECT * FROM students WHERE student_name LIKE ? OR usn LIKE ? OR department LIKE ?',
+            (f'%{search}%', f'%{search}%', f'%{search}%')
+        ).fetchall()
+    else:
+        students = conn.execute(
+            'SELECT * FROM students'
+        ).fetchall()
 
     conn.close()
 
     return render_template(
         'students.html',
-        students=students
+        students=students,
+        search=search
     )
 
 
-@app.route('/attendance')
+@app.route('/attendance', methods=['GET', 'POST'])
 @login_required
 def attendance():
 
     conn = get_db_connection()
+    date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
 
-    date = datetime.now().strftime('%Y-%m-%d')
+    if request.method == 'POST':
+        selected_date = request.form.get('date')
 
+        # Get all students
+        students = conn.execute('SELECT id FROM students').fetchall()
+
+        for student in students:
+            student_id = student['id']
+            status = request.form.get(f'status_{student_id}')
+
+            if status:
+                # Check if record exists
+                existing = conn.execute(
+                    'SELECT id FROM attendance WHERE student_id=? AND date=?',
+                    (student_id, selected_date)
+                ).fetchone()
+
+                if existing:
+                    conn.execute(
+                        'UPDATE attendance SET status=? WHERE id=?',
+                        (status, existing['id'])
+                    )
+                else:
+                    conn.execute(
+                        'INSERT INTO attendance (student_id, date, status) VALUES (?, ?, ?)',
+                        (student_id, selected_date, status)
+                    )
+
+        conn.commit()
+        conn.close()
+        flash(f'Attendance marked for {selected_date} successfully!', 'success')
+        return redirect(url_for('attendance', date=selected_date))
+
+    # Get students with their attendance for the selected date
     query = '''
         SELECT s.id, s.student_name, s.usn,
                s.department, a.status
