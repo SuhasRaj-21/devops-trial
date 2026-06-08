@@ -5,10 +5,19 @@ from datetime import datetime
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, jsonify
 
+import shutil
+
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_attendance_system'
 
-DB_FILE = 'attendance.db'
+# On Vercel, the filesystem is read-only. We copy the sqlite database to /tmp to allow writes.
+if os.environ.get('VERCEL') or os.environ.get('NOW_REGION'):
+    DB_FILE = '/tmp/attendance.db'
+    if not os.path.exists(DB_FILE):
+        if os.path.exists('attendance.db'):
+            shutil.copy('attendance.db', DB_FILE)
+else:
+    DB_FILE = 'attendance.db'
 
 
 def get_db_connection():
@@ -80,9 +89,10 @@ def init_db():
     conn.close()
 
 
-# Create exports folder
-if not os.path.exists('exports'):
-    os.makedirs('exports')
+# Create exports folder (use /tmp on Vercel)
+EXPORT_DIR = '/tmp/exports' if (os.environ.get('VERCEL') or os.environ.get('NOW_REGION')) else 'exports'
+if not os.path.exists(EXPORT_DIR):
+    os.makedirs(EXPORT_DIR)
 
 # Initialize DB
 init_db()
@@ -352,7 +362,7 @@ def export_csv():
 
     filename = f'attendance_report_{timestamp}.csv'
 
-    filepath = os.path.join('exports', filename)
+    filepath = os.path.join(EXPORT_DIR, filename)
 
     with open(filepath, 'w', newline='') as f:
 
